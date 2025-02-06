@@ -53,7 +53,7 @@
         //    .lazy = false,
         //},
         .mibu = .{
-            .path = "mibu",
+            .path = "vendor/mibu",
         },
     },
 
