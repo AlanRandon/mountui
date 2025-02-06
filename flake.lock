@@ -55,22 +55,6 @@
         "type": "github"
       }
     },
-    "mibu": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1734237020,
-        "narHash": "sha256-fuvrK5IfToYrWuEMZmaic70X5j294+rVUgcSR+7PB6k=",
-        "owner": "xyaman",
-        "repo": "mibu",
-        "rev": "b001662c929e2719ee24be585a3120640f946337",
-        "type": "github"
-      },
-      "original": {
-        "owner": "xyaman",
-        "repo": "mibu",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1737632463,
@@ -90,7 +74,6 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "mibu": "mibu",
         "nixpkgs": "nixpkgs",
         "zig-overlay": "zig-overlay",
         "zls-overlay": "zls-overlay"

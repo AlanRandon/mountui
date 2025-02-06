@@ -17,18 +17,20 @@
         flake-utils.follows = "flake-utils";
       };
     };
-    mibu = {
-      url = "github:xyaman/mibu";
-      flake = false;
-    };
   };
 
-  outputs = { nixpkgs, zig-overlay, zls-overlay, flake-utils, mibu, self, ... }:
+  outputs = { nixpkgs, zig-overlay, zls-overlay, flake-utils, self, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         zig = zig-overlay.packages.${system}.master;
         zls = zls-overlay.packages.${system}.zls.overrideAttrs { nativeBuildInputs = [ zig ]; };
         pkgs = import nixpkgs { inherit system; };
+        mibu = pkgs.fetchFromGitHub {
+          owner = "xyaman";
+          repo = "mibu";
+          rev = "b001662c929e2719ee24be585a3120640f946337";
+          hash = "sha256-fuvrK5IfToYrWuEMZmaic70X5j294+rVUgcSR+7PB6k=";
+        };
       in
       {
         packages.default = pkgs.stdenv.mkDerivation (finalAttrs: {
