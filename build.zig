@@ -16,7 +16,6 @@ pub fn build(b: *std.Build) void {
     });
 
     exe_mod.addImport("mibu", mibu.module("mibu"));
-    // exe_mod.addIncludePath(b.path("glib-2.0"));
     exe_mod.linkSystemLibrary("glib-2.0", .{});
     exe_mod.linkSystemLibrary("gobject-2.0", .{});
     exe_mod.linkSystemLibrary("gio-2.0", .{});
