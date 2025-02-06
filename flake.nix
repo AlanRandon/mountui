@@ -19,7 +19,7 @@
     };
   };
 
-  outputs = { nixpkgs, zig-overlay, zls-overlay, flake-utils, mibu, self, ... }:
+  outputs = { nixpkgs, zig-overlay, zls-overlay, flake-utils, self, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         zig = zig-overlay.packages.${system}.master;
