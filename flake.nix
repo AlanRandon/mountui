@@ -19,18 +19,12 @@
     };
   };
 
-  outputs = { nixpkgs, zig-overlay, zls-overlay, flake-utils, self, ... }:
+  outputs = { nixpkgs, zig-overlay, zls-overlay, flake-utils, mibu, self, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         zig = zig-overlay.packages.${system}.master;
         zls = zls-overlay.packages.${system}.zls.overrideAttrs { nativeBuildInputs = [ zig ]; };
         pkgs = import nixpkgs { inherit system; };
-        mibu = pkgs.fetchFromGitHub {
-          owner = "xyaman";
-          repo = "mibu";
-          rev = "b001662c929e2719ee24be585a3120640f946337";
-          hash = "sha256-fuvrK5IfToYrWuEMZmaic70X5j294+rVUgcSR+7PB6k=";
-        };
       in
       {
         packages.default = pkgs.stdenv.mkDerivation (finalAttrs: {
@@ -48,7 +42,6 @@
           buildInputs = [ pkgs.udisks.dev pkgs.glib ];
 
           buildPhase = ''
-            cp -r ${mibu} mibu
             mkdir -p .cache
             zig build install --prefix $out -Doptimize=ReleaseFast -Dtarget=native-native-gnu.2.40 --cache-dir $(pwd)/.zig-cache --global-cache-dir $(pwd)/.cache'';
 
