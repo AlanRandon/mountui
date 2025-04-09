@@ -14,13 +14,21 @@
       inputs = {
         nixpkgs.follows = "nixpkgs";
         zig-overlay.follows = "zig-overlay";
-        flake-utils.follows = "flake-utils";
       };
     };
   };
 
-  outputs = { nixpkgs, zig-overlay, zls-overlay, flake-utils, self, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      nixpkgs,
+      zig-overlay,
+      zls-overlay,
+      flake-utils,
+      self,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         zig = zig-overlay.packages.${system}.master;
         zls = zls-overlay.packages.${system}.zls.overrideAttrs { nativeBuildInputs = [ zig ]; };
@@ -39,7 +47,10 @@
             pkgs.dbus
           ];
 
-          buildInputs = [ pkgs.udisks.dev pkgs.glib ];
+          buildInputs = [
+            pkgs.udisks.dev
+            pkgs.glib
+          ];
 
           buildPhase = ''
             mkdir -p .cache
@@ -66,9 +77,18 @@
         };
 
         devShells.default = pkgs.mkShell {
-          nativeBuildInputs = [ pkgs.pkg-config zig pkgs.udisks.dev pkgs.glib ];
-          buildInputs = [ pkgs.udisks.dev pkgs.glib ];
+          nativeBuildInputs = [
+            pkgs.pkg-config
+            zig
+            pkgs.udisks.dev
+            pkgs.glib
+          ];
+          buildInputs = [
+            pkgs.udisks.dev
+            pkgs.glib
+          ];
           packages = [ zls ];
         };
-      });
+      }
+    );
 }

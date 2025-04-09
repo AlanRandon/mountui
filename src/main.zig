@@ -88,7 +88,58 @@ fn render(state: *const State, out: anytype) !void {
     try out.print("Down/Up: {0s}j/k{1s} Rescan: {0s}r{1s} Mount/Unmount: {0s}m/u{1s} Quit: {0s}q{1s}", .{ mibu.style.print.bold, mibu.style.print.no_bold });
 }
 
+fn sigwinchHandler(signum: c_int) callconv(.C) void {
+    std.debug.assert(signum == std.posix.SIG.WINCH);
+    event_queue.enqueue(.resize) catch return;
+}
+
+const Event = union(enum) {
+    mibu: mibu.events.Event,
+    resize,
+
+    const Queue = struct {
+        events: List,
+        lock: std.Thread.Mutex,
+        condition: std.Thread.Condition,
+        allocator: std.mem.Allocator,
+
+        const List = std.DoublyLinkedList(Event);
+
+        fn init(allocator: Allocator) Queue {
+            return .{
+                .events = .{},
+                .lock = .{},
+                .condition = .{},
+                .allocator = allocator,
+            };
+        }
+
+        fn enqueue(queue: *Queue, event: Event) !void {
+            queue.lock.lock();
+            defer queue.lock.unlock();
+            const node = try queue.allocator.create(List.Node);
+            errdefer queue.allocator.destroy(node);
+            node.* = .{ .data = event };
+            queue.events.prepend(node);
+            queue.condition.signal();
+        }
+    };
+};
+
+var event_queue = Event.Queue.init(std.heap.c_allocator);
+
 pub fn main() !void {
+    const allocator = std.heap.c_allocator;
+
+    {
+        var sa: std.posix.Sigaction = .{
+            .handler = .{ .handler = sigwinchHandler },
+            .mask = std.posix.empty_sigset,
+            .flags = std.posix.SA.RESTART,
+        };
+        std.posix.sigaction(std.posix.SIG.WINCH, &sa, null);
+    }
+
     const stdin = std.io.getStdIn();
     const stdout = std.io.getStdOut();
 
@@ -101,7 +152,6 @@ pub fn main() !void {
     try mibu.cursor.hide(stdout.writer());
     defer mibu.cursor.show(stdout.writer()) catch {};
 
-    const allocator = std.heap.c_allocator;
     const client: *c.UDisksClient = c.udisks_client_new_sync(null, null) orelse return error.CreateClient;
     defer c.g_object_unref(client);
 
@@ -114,63 +164,86 @@ pub fn main() !void {
 
     try render(&state, stdout.writer());
 
+    _ = try std.Thread.spawn(.{}, struct {
+        fn listen(in: std.fs.File) void {
+            while (true) {
+                const ev = mibu.events.next(in.reader()) catch continue;
+                event_queue.enqueue(.{ .mibu = ev }) catch continue;
+            }
+        }
+    }.listen, .{stdin});
+
+    event_queue.lock.lock();
+    defer event_queue.lock.unlock();
+
     while (true) {
-        const event = try mibu.events.next(stdin.reader());
+        while (event_queue.events.len == 0) {
+            event_queue.condition.wait(&event_queue.lock);
+        }
+
+        const event = event_queue.events.pop() orelse unreachable;
+        defer event_queue.allocator.destroy(event);
+
         // Event.resize does not actually exist (yet?)
         state.size = try mibu.term.getSize(stdin.handle);
-        switch (event) {
-            .key => |key| switch (key) {
-                .char => |char| switch (char) {
-                    'r' => {
-                        c.udisks_client_settle(client);
-                        allocator.free(state.filesystems);
-                        state.filesystems = try Filesystem.find(client, allocator);
-                        state.selected_index = @min(state.selected_index, state.filesystems.len -| 1);
-                        try render(&state, stdout.writer());
-                    },
-                    'j' => {
-                        state.selected_index = @min(state.selected_index + 1, state.filesystems.len -| 1);
-                        try render(&state, stdout.writer());
-                    },
-                    'k' => {
-                        state.selected_index -|= 1;
-                        try render(&state, stdout.writer());
-                    },
-                    'm' => if (state.filesystems.len != 0) {
-                        const fs = state.filesystems[state.selected_index];
-                        _ = c.udisks_filesystem_call_mount_sync(
-                            fs.filesystem,
-                            c.g_variant_new_array(c.g_variant_type_checked_("{sv}"), null, 0),
-                            null,
-                            null,
-                            null,
-                        );
+        switch (event.data) {
+            .resize => {
+                try render(&state, stdout.writer());
+            },
+            .mibu => |ev| switch (ev) {
+                .key => |key| switch (key) {
+                    .char => |char| switch (char) {
+                        'r' => {
+                            c.udisks_client_settle(client);
+                            allocator.free(state.filesystems);
+                            state.filesystems = try Filesystem.find(client, allocator);
+                            state.selected_index = @min(state.selected_index, state.filesystems.len -| 1);
+                            try render(&state, stdout.writer());
+                        },
+                        'j' => {
+                            state.selected_index = @min(state.selected_index + 1, state.filesystems.len -| 1);
+                            try render(&state, stdout.writer());
+                        },
+                        'k' => {
+                            state.selected_index -|= 1;
+                            try render(&state, stdout.writer());
+                        },
+                        'm' => if (state.filesystems.len != 0) {
+                            const fs = state.filesystems[state.selected_index];
+                            _ = c.udisks_filesystem_call_mount_sync(
+                                fs.filesystem,
+                                c.g_variant_new_array(c.g_variant_type_checked_("{sv}"), null, 0),
+                                null,
+                                null,
+                                null,
+                            );
 
-                        c.udisks_client_settle(client);
-                        allocator.free(state.filesystems);
-                        state.filesystems = try Filesystem.find(client, allocator);
-                        try render(&state, stdout.writer());
-                    },
-                    'u' => if (state.filesystems.len != 0) {
-                        const fs = state.filesystems[state.selected_index];
-                        _ = c.udisks_filesystem_call_unmount_sync(
-                            fs.filesystem,
-                            c.g_variant_new_array(c.g_variant_type_checked_("{sv}"), null, 0),
-                            null,
-                            null,
-                        );
+                            c.udisks_client_settle(client);
+                            allocator.free(state.filesystems);
+                            state.filesystems = try Filesystem.find(client, allocator);
+                            try render(&state, stdout.writer());
+                        },
+                        'u' => if (state.filesystems.len != 0) {
+                            const fs = state.filesystems[state.selected_index];
+                            _ = c.udisks_filesystem_call_unmount_sync(
+                                fs.filesystem,
+                                c.g_variant_new_array(c.g_variant_type_checked_("{sv}"), null, 0),
+                                null,
+                                null,
+                            );
 
-                        c.udisks_client_settle(client);
-                        allocator.free(state.filesystems);
-                        state.filesystems = try Filesystem.find(client, allocator);
-                        try render(&state, stdout.writer());
+                            c.udisks_client_settle(client);
+                            allocator.free(state.filesystems);
+                            state.filesystems = try Filesystem.find(client, allocator);
+                            try render(&state, stdout.writer());
+                        },
+                        'q' => break,
+                        else => {},
                     },
-                    'q' => break,
                     else => {},
                 },
                 else => {},
             },
-            else => {},
         }
     }
 }
