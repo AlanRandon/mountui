@@ -103,7 +103,12 @@ const Event = union(enum) {
         condition: std.Thread.Condition,
         allocator: std.mem.Allocator,
 
-        const List = std.DoublyLinkedList(Event);
+        const List = std.DoublyLinkedList;
+
+        const Node = struct {
+            node: List.Node,
+            item: Event,
+        };
 
         fn init(allocator: Allocator) Queue {
             return .{
@@ -117,10 +122,10 @@ const Event = union(enum) {
         fn enqueue(queue: *Queue, event: Event) !void {
             queue.lock.lock();
             defer queue.lock.unlock();
-            const node = try queue.allocator.create(List.Node);
+            const node = try queue.allocator.create(Node);
             errdefer queue.allocator.destroy(node);
-            node.* = .{ .data = event };
-            queue.events.prepend(node);
+            node.* = .{ .node = .{}, .item = event };
+            queue.events.prepend(&node.node);
             queue.condition.signal();
         }
     };
@@ -177,16 +182,17 @@ pub fn main() !void {
     defer event_queue.lock.unlock();
 
     while (true) {
-        while (event_queue.events.len == 0) {
+        while (event_queue.events.first == null) {
             event_queue.condition.wait(&event_queue.lock);
         }
 
-        const event = event_queue.events.pop() orelse unreachable;
-        defer event_queue.allocator.destroy(event);
+        const node = event_queue.events.pop() orelse unreachable;
+        const node_ptr = @as(*Event.Queue.Node, @fieldParentPtr("node", node));
+        defer event_queue.allocator.destroy(node_ptr);
 
         // Event.resize does not actually exist (yet?)
         state.size = try mibu.term.getSize(stdin.handle);
-        switch (event.data) {
+        switch (node_ptr.item) {
             .resize => {
                 try render(&state, stdout.writer());
             },

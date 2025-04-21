@@ -14,7 +14,7 @@ pub const Event = union(enum) {
 const Key = union(enum) {
     // unicode character
     char: u21,
-    
+
     // TODO: do we really need u21?
     ctrl: u21,
     alt: u21,
@@ -162,11 +162,11 @@ pub const MouseButton = enum {
     __non_exhaustive,
 };
 
-/// Returns the next event received. If no event is received within the timeout, 
+/// Returns the next event received. If no event is received within the timeout,
 /// it returns `.none`. Timeout is in miliseconds
 ///
 /// When used in canonical mode, the user needs to press Enter to receive the event.
-/// When raw terminal mode is activated, the function waits up to the specified timeout 
+/// When raw terminal mode is activated, the function waits up to the specified timeout
 /// for at least one event before returning.
 pub fn nextWithTimeout(in: anytype, timeout_ms: i32) !Event {
     var polls: [1]std.posix.pollfd = .{.{
@@ -195,7 +195,7 @@ pub fn next(in: anytype) !Event {
     }
 
     // const view = try std.unicode.Utf8View.init(buf[0..c]);
-    
+
     // This is hacky to make mouse code work
     // utf8 view failes to parse mouse events, dont know why, need to check it later
     // TODO: check why utf8 view fails to parse mouse events
