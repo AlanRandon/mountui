@@ -54,8 +54,9 @@
         //    // actually used.
         //    .lazy = false,
         //},
-        .mibu = .{
-            .path = "vendor/mibu",
+        .ansio = .{
+            .url = "git+https://github.com/AlanRandon/ansio#2985098b20a143d1fda7f8da1287b52197de798e",
+            .hash = "ansio-0.0.0-XC38dZdoAADjel3IFoxki7b6fDPHTlmIV11To7Ga3ekY",
         },
     },
 

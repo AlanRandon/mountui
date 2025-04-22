@@ -2,6 +2,13 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    zig2nix = {
+      url = "github:Cloudef/zig2nix";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
     zig-overlay = {
       url = "github:mitchellh/zig-overlay";
       inputs = {
@@ -24,7 +31,7 @@
       zig-overlay,
       zls-overlay,
       flake-utils,
-      self,
+      zig2nix,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -33,48 +40,41 @@
         zig = zig-overlay.packages.${system}.master;
         zls = zls-overlay.packages.${system}.zls.overrideAttrs { nativeBuildInputs = [ zig ]; };
         pkgs = import nixpkgs { inherit system; };
+        zig-env = zig2nix.outputs.zig-env.${system} {
+          zig = zig2nix.outputs.packages.${system}.zig-master;
+        };
       in
-      {
-        packages.default = pkgs.stdenv.mkDerivation (finalAttrs: {
-          src = ./.;
-          name = "mountui";
+      rec {
+        packages.default = zig-env.package rec {
+          src = zig-env.pkgs.lib.cleanSource ./.;
 
-          nativeBuildInputs = [
-            zig
-            pkgs.pkg-config
-            pkgs.wrapGAppsHook
-            pkgs.gobject-introspection
-            pkgs.dbus
+          nativeBuildInputs = with zig-env.pkgs; [
+            pkg-config
+            wrapGAppsHook
+            gobject-introspection
+            dbus
           ];
 
-          buildInputs = [
-            pkgs.udisks.dev
-            pkgs.glib
+          buildInputs = with zig-env.pkgs; [
+            udisks.dev
+            udisks
+            glib
           ];
 
-          buildPhase = ''
-            mkdir -p .cache
-            zig build install --prefix $out -Doptimize=ReleaseFast -Dtarget=native-native-gnu.2.40 --cache-dir $(pwd)/.zig-cache --global-cache-dir $(pwd)/.cache'';
+          zigWrapperLibs = buildInputs;
 
-          preFixup =
-            let
-              libPath = pkgs.lib.makeLibraryPath [
-                pkgs.udisks
-                pkgs.glib
-              ];
-            in
-            ''
-              patchelf \
-                --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
-                --set-rpath "${libPath}" \
-                $out/bin/mountui
-            '';
-        });
+          zigBuildFlags = [ "-Doptimize=ReleaseFast" ];
+
+          zigBuildZonLock = ./build.zig.zon2json-lock;
+        };
 
         apps.default = {
           type = "app";
-          program = "${self.packages.${system}.default}/bin/mountui";
+          program = "${packages.default}/bin/mountui";
         };
+
+        apps.zig2nix = zig-env.app [ ] "zig2nix \"$@\"";
+        apps.zon2lock = zig-env.app [ ] "zig2nix zon2lock \"$@\"";
 
         devShells.default = pkgs.mkShell {
           nativeBuildInputs = [

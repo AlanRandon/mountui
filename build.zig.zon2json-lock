@@ -1,0 +1,8 @@
+{
+  "ansio-0.0.0-XC38dZdoAADjel3IFoxki7b6fDPHTlmIV11To7Ga3ekY": {
+    "name": "ansio",
+    "url": "git+https://github.com/AlanRandon/ansio#2985098b20a143d1fda7f8da1287b52197de798e",
+    "hash": "sha256-ITbTrqBp4vuPGEBHnJTszhNttGuoMm04N0eZ8Hurz8E=",
+    "rev": "2985098b20a143d1fda7f8da1287b52197de798e"
+  }
+}

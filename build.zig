@@ -4,18 +4,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const mibu = b.dependency("mibu", .{
-        .target = target,
-        .optimize = optimize,
-    });
-
     const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    exe_mod.addImport("mibu", mibu.module("mibu"));
+    const ansio = b.dependency("ansio", .{});
+    exe_mod.addImport("RawTerm", ansio.module("RawTerm"));
+
     exe_mod.linkSystemLibrary("glib-2.0", .{});
     exe_mod.linkSystemLibrary("gobject-2.0", .{});
     exe_mod.linkSystemLibrary("gio-2.0", .{});
